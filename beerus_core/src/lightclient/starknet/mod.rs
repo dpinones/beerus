@@ -6,7 +6,9 @@ use starknet::{
     core::types::FieldElement,
     providers::jsonrpc::{
         models::FunctionCall,
-        models::{BlockHashAndNumber, BlockId, ContractClass, SyncStatusType},
+        models::{
+            BlockHashAndNumber, BlockId, ContractClass, EventFilter, EventsPage, SyncStatusType,
+        },
         HttpTransport, JsonRpcClient,
     },
 };
@@ -40,6 +42,12 @@ pub trait StarkNetLightClient: Send + Sync {
         contract_address: FieldElement,
     ) -> Result<ContractClass>;
     async fn get_block_transaction_count(&self, block_id: &BlockId) -> Result<u64>;
+    async fn get_events(
+        &self,
+        filter: EventFilter,
+        continuation_token: Option<String>,
+        chunk_size: u64,
+    ) -> Result<EventsPage>;
     async fn syncing(&self) -> Result<SyncStatusType>;
 }
 
@@ -226,5 +234,17 @@ impl StarkNetLightClient for StarkNetLightClientImpl {
     /// `Err(eyre::Report)` if the operation failed.
     async fn syncing(&self) -> Result<SyncStatusType> {
         self.client.syncing().await.map_err(|e| eyre::eyre!(e))
+    }
+
+    async fn get_events(
+        &self,
+        filter: EventFilter,
+        continuation_token: Option<String>,
+        chunk_size: u64,
+    ) -> Result<EventsPage> {
+        self.client
+            .get_events(filter, continuation_token, chunk_size)
+            .await
+            .map_err(|e| eyre::eyre!(e))
     }
 }

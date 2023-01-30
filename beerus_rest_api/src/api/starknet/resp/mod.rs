@@ -1,4 +1,4 @@
-use rocket::serde::Serialize;
+use rocket::serde::{Deserialize, Serialize};
 use schemars::JsonSchema;
 use serde_json::Value;
 #[derive(Serialize, JsonSchema)]
@@ -94,4 +94,22 @@ pub struct QueryGetBlockTransactionCountResponse {
 pub struct QuerySyncing {
     pub data: Option<Value>,
     pub status: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EventsObject {
+    pub from_block_id_type: Option<String>,
+    pub from_block_id: Option<String>,
+    pub to_block_id_type: Option<String>,
+    pub to_block_id: Option<String>,
+    pub page_number: Option<String>,
+    pub page_size: u64,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(crate = "rocket::serde")]
+pub struct QueryGetEventsResponse {
+    pub events: Value,
+    pub continuation_token: String,
 }

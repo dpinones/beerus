@@ -1,9 +1,9 @@
 use super::resp::{
-    QueryBlockHashAndNumberResponse, QueryBlockNumberResponse, QueryChainIdResponse,
+    EventsObject, QueryBlockHashAndNumberResponse, QueryBlockNumberResponse, QueryChainIdResponse,
     QueryContractViewResponse, QueryGetBlockTransactionCountResponse, QueryGetClassAtResponse,
-    QueryGetClassResponse, QueryGetStorageAtResponse, QueryL1ToL2MessageCancellationsResponse,
-    QueryL1ToL2MessageNonceResponse, QueryL1ToL2MessagesResponse, QueryNonceResponse,
-    QueryStateRootResponse, QuerySyncing,
+    QueryGetClassResponse, QueryGetEventsResponse, QueryGetStorageAtResponse,
+    QueryL1ToL2MessageCancellationsResponse, QueryL1ToL2MessageNonceResponse,
+    QueryL1ToL2MessagesResponse, QueryNonceResponse, QueryStateRootResponse, QuerySyncing,
 };
 use crate::api::ApiResponse;
 
@@ -12,10 +12,11 @@ use beerus_core::lightclient::beerus::BeerusLightClient;
 use ethers::types::U256;
 use eyre::Result;
 use log::debug;
+use rocket::serde::json::Json;
 use rocket::{get, State};
 use rocket_okapi::openapi;
 use starknet::core::types::FieldElement;
-use starknet::providers::jsonrpc::models::SyncStatusType;
+use starknet::providers::jsonrpc::models::{EventFilter, SyncStatusType};
 use std::str::FromStr;
 
 /// Query the state root of StarkNet.
@@ -199,6 +200,15 @@ pub async fn get_block_transaction_count(
     ApiResponse::from_result(
         get_block_transaction_count_inner(beerus, block_id_type, block_id).await,
     )
+}
+
+#[openapi]
+#[post("/starknet/events", data = "<events_object>")]
+pub async fn get_events(
+    beerus: &State<BeerusLightClient>,
+    events_object: Json<EventsObject>,
+) -> ApiResponse<QueryGetEventsResponse> {
+    ApiResponse::from_result(get_events_inner(beerus, events_object).await)
 }
 
 /// Query an object about the node starknet sync status
@@ -542,6 +552,60 @@ pub async fn get_block_transaction_count_inner(
             .get_block_transaction_count(&block_id)
             .await?
             .to_string(),
+    })
+}
+
+pub async fn get_events_inner(
+    beerus: &State<BeerusLightClient>,
+    events_object: Json<EventsObject>,
+) -> Result<QueryGetEventsResponse> {
+    debug!("Querying Get Events");
+    let Json(EventsObject {
+        from_block_id_type,
+        from_block_id,
+        to_block_id_type,
+        to_block_id,
+        page_number,
+        page_size,
+    }) = events_object;
+
+    let from_block_dale = match (from_block_id_type, from_block_id) {
+        (Some(from_block_id_type_str), Some(from_block_id_str)) => {
+            let result = beerus_core::starknet_helper::block_id_string_to_block_id_type(
+                &from_block_id_type_str,
+                &from_block_id_str,
+            );
+            Some(result?)
+        }
+        _ => None,
+    };
+
+    let to_block_dale = match (to_block_id_type, to_block_id) {
+        (Some(to_block_id_type_str), Some(to_block_id_str)) => {
+            let result = beerus_core::starknet_helper::block_id_string_to_block_id_type(
+                &to_block_id_type_str,
+                &to_block_id_str,
+            );
+            Some(result?)
+        }
+        _ => None,
+    };
+
+    let filter = EventFilter {
+        from_block: from_block_dale,
+        to_block: to_block_dale,
+        address: None,
+        keys: None,
+    };
+
+    let result = beerus
+        .starknet_lightclient
+        .get_events(filter, page_number, page_size)
+        .await?;
+
+    Ok(QueryGetEventsResponse {
+        events: serde_json::value::to_value(result.events).unwrap(),
+        continuation_token: result.continuation_token.unwrap(),
     })
 }
 

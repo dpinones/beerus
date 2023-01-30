@@ -4,8 +4,20 @@ use beerus_core::lightclient::beerus::BeerusLightClient;
 use ethers::types::U256;
 use eyre::Result;
 use starknet::core::types::FieldElement;
+use starknet::providers::jsonrpc::models::EventFilter;
 
 use crate::model::CommandResponse;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EventsObject {
+    pub from_block_id_type: Option<String>,
+    pub from_block_id: Option<String>,
+    pub to_block_id_type: Option<String>,
+    pub to_block_id: Option<String>,
+    pub page_number: Option<String>,
+    pub page_size: u64,
+}
 
 /// Query the StarkNet state root.
 /// # Arguments
@@ -279,6 +291,49 @@ pub async fn get_block_transaction_count(
         beerus
             .starknet_lightclient
             .get_block_transaction_count(&block_id)
+            .await?,
+    ))
+}
+
+pub async fn get_events(beerus: BeerusLightClient, params: String) -> Result<CommandResponse> {
+    let events_object: EventsObject = serde_json::from_str(&params)?;
+
+    let from_block = match (
+        events_object.from_block_id_type,
+        events_object.from_block_id,
+    ) {
+        (Some(from_block_id_type_str), Some(from_block_id_str)) => {
+            let result = beerus_core::starknet_helper::block_id_string_to_block_id_type(
+                &from_block_id_type_str,
+                &from_block_id_str,
+            );
+            Some(result?)
+        }
+        _ => None,
+    };
+
+    let to_block = match (events_object.to_block_id_type, events_object.to_block_id) {
+        (Some(to_block_id_type_str), Some(to_block_id_str)) => {
+            let result = beerus_core::starknet_helper::block_id_string_to_block_id_type(
+                &to_block_id_type_str,
+                &to_block_id_str,
+            );
+            Some(result?)
+        }
+        _ => None,
+    };
+
+    let filter = EventFilter {
+        from_block,
+        to_block,
+        address: None,
+        keys: None,
+    };
+
+    Ok(CommandResponse::StarknetQueryGetEvents(
+        beerus
+            .starknet_lightclient
+            .get_events(filter, events_object.page_number, events_object.page_size)
             .await?,
     ))
 }

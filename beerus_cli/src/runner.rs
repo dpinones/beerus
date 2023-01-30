@@ -165,6 +165,9 @@ pub async fn run(beerus: BeerusLightClient, cli: Cli) -> Result<CommandResponse>
                 .await
             }
             StarkNetSubCommands::QuerySyncing {} => starknet::query_starknet_syncing(beerus).await,
+            StarkNetSubCommands::QueryGetEvents { params } => {
+                starknet::get_events(beerus, params.to_owned()).await
+            }
         },
     }
 }
