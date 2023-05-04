@@ -1,0 +1,15 @@
+[book]
+authors = ["dpinones"]
+language = "en"
+multilingual = false
+src = "src"
+title = "hello-mdbook"
+
+[output.html]
+# disable numeric section labels
+no-section-label = true 
+git-repository-url = "https://github.com/dpinones/hello-mdbook"
+git-repository-icon = "fa-github"
+
+[output.html.fold]
+enable = true
